@@ -74,7 +74,8 @@
         }
         #login-view.hidden { opacity: 0; transform: translateY(-100%) scale(0.95); pointer-events: none; }
 
-        .login-bear-box { width: 140px; height: 128px; margin-bottom: 1.5rem; cursor: pointer; }
+        .login-bear-box { width: 140px; height: 128px; margin-bottom: 1.5rem; cursor: pointer; position: relative; z-index: 0; }
+        .login-bear-box .cute-bear-ear { pointer-events: none; }
         .login-bear-box .cute-bear-ear { width: 46px; height: 46px; }
         .login-bear-box .cute-bear-eye { width: 13px; height: 13px; top: 42%; }
         .login-bear-box .cute-bear-eye.left { left: 25%; }
@@ -93,7 +94,7 @@
         .login-subtitle { font-size: 1.3rem; color: var(--text-muted); margin-bottom: 2rem; font-weight: 500; }
 
         /* ===== LOGIN TABS ===== */
-        .login-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-cream); border-radius: var(--border-radius-sm); padding: 6px; border: var(--soft-border); }
+        .login-tabs { display: flex; gap: 0.5rem; margin-bottom: 1.5rem; background: var(--bg-cream); border-radius: var(--border-radius-sm); padding: 6px; border: var(--soft-border); position: relative; z-index: 10; }
         .login-tab {
             flex: 1; padding: 0.8rem 1.5rem; border: none; border-radius: 14px;
             font-size: 1.1rem; font-weight: 600; cursor: pointer; transition: var(--transition);
@@ -101,7 +102,7 @@
         }
         .login-tab.active { background: var(--bg-card); color: var(--soft-brown); box-shadow: var(--shadow-sm); }
 
-        .login-card { background: var(--bg-card); border: var(--soft-border); border-radius: var(--border-radius); padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: var(--shadow-md); }
+        .login-card { background: var(--bg-card); border: var(--soft-border); border-radius: var(--border-radius); padding: 2.5rem; width: 100%; max-width: 400px; box-shadow: var(--shadow-md); position: relative; z-index: 10; }
         .login-form-group { margin-bottom: 1.3rem; text-align: left; }
         .login-form-group label { display: block; font-weight: 600; margin-bottom: 0.5rem; font-size: 1.05rem; }
         .login-input {
@@ -264,20 +265,7 @@
 
     <!-- ===== LOGIN SCREEN ===== -->
     <section id="login-view">
-        <div class="cute-bear-container login-bear-box" onclick="winkLoginBear()">
-            <div class="cute-bear-ear left"></div>
-            <div class="cute-bear-ear right"></div>
-            <div class="cute-bear-head" id="login-bear">
-                <div class="cute-bear-eye left"></div>
-                <div class="cute-bear-eye right"></div>
-                <div class="cute-bear-blush left"></div>
-                <div class="cute-bear-blush right"></div>
-                <div class="cute-bear-snout">
-                    <div class="cute-bear-nose"></div>
-                    <div class="cute-bear-mouth"></div>
-                </div>
-            </div>
-        </div>
+        <div class="login-bear-emoji" onclick="winkLoginBear()" id="login-bear">🧸</div>
         <h1 class="login-title">🧸 <span>Filipino</span> Learning Hub</h1>
         <p class="login-subtitle">"Tuklasin ang ganda ng Wikang Filipino!" ✨</p>
 
@@ -773,8 +761,8 @@
         // ===== BEAR WINK =====
         function winkLoginBear() {
             const bear = document.getElementById('login-bear');
-            bear.classList.add('winking');
-            setTimeout(() => bear.classList.remove('winking'), 800);
+            bear.textContent = '😉';
+            setTimeout(() => bear.textContent = '🧸', 600);
         }
 
         // ===== NAVIGATION =====
