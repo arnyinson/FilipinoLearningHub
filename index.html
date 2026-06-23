@@ -74,21 +74,6 @@
         }
         #login-view.hidden { opacity: 0; transform: translateY(-100%) scale(0.95); pointer-events: none; }
 
-        .login-bear-box { width: 140px; height: 128px; margin-bottom: 1.5rem; cursor: pointer; position: relative; z-index: 0; }
-        .login-bear-box .cute-bear-ear { pointer-events: none; }
-        .login-bear-box .cute-bear-ear { width: 46px; height: 46px; }
-        .login-bear-box .cute-bear-eye { width: 13px; height: 13px; top: 42%; }
-        .login-bear-box .cute-bear-eye.left { left: 25%; }
-        .login-bear-box .cute-bear-eye.right { right: 25%; }
-        .login-bear-box .cute-bear-blush { width: 20px; height: 13px; top: 54%; }
-        .login-bear-box .cute-bear-blush.left { left: 12%; }
-        .login-bear-box .cute-bear-blush.right { right: 12%; }
-        .login-bear-box .cute-bear-snout { width: 42px; height: 32px; bottom: 18%; left: 36%; }
-        .login-bear-box .cute-bear-nose { width: 13px; height: 8px; }
-        .login-bear-box:hover { transform: scale(1.08) rotate(2deg); }
-        .login-bear-box .cute-bear-head.winking .cute-bear-eye.left { background: transparent; border: none; border-bottom: 4px solid #2D231E; border-radius: 0 0 10px 10px; height: 7px; width: 16px; top: 45%; left: 24%; }
-        .login-bear-box .cute-bear-head.winking .cute-bear-eye.left::after { display: none; }
-
         .login-title { font-size: 3rem; color: var(--soft-brown); margin-bottom: 0.4rem; font-weight: 700; }
         .login-title span { color: var(--primary-pink); }
         .login-subtitle { font-size: 1.3rem; color: var(--text-muted); margin-bottom: 2rem; font-weight: 500; }
@@ -124,16 +109,6 @@
 
         .student-hint { font-size: 0.95rem; color: var(--text-muted); margin-top: 1rem; font-style: italic; }
 
-        /* ===== LANDING VIEW (kept for transition) ===== */
-        #landing-view {
-            display: flex; flex-direction: column; align-items: center; justify-content: center;
-            min-height: 100vh; padding: 2rem; text-align: center;
-            background: radial-gradient(circle at center, var(--bg-card) 0%, var(--bg-cream) 100%);
-            position: fixed; top: 0; left: 0; width: 100%; height: 100%; z-index: 9998;
-            transition: opacity 0.5s ease, transform 0.5s ease;
-        }
-        #landing-view.hidden { opacity: 0; transform: translateY(-100%) scale(0.95); pointer-events: none; }
-
         /* ===== APP ===== */
         #app-view { display: none; max-width: 1160px; margin: 0 auto; padding: 2rem 1rem; }
         #app-view.active { display: block; }
@@ -143,7 +118,6 @@
         .brand-logo span { color: var(--primary-pink); }
         .nav-controls { display: flex; align-items: center; gap: 1rem; }
 
-        /* ===== LOGGED IN USER BADGE ===== */
         .user-badge { display: flex; align-items: center; gap: 0.5rem; background: var(--accent-mint); padding: 0.5rem 1.2rem; border-radius: 30px; font-size: 1rem; font-weight: 700; color: var(--soft-brown); }
         .user-badge.teacher { background: var(--accent-lavender); }
 
@@ -255,9 +229,11 @@
         .floating-heart { position: absolute; bottom: -30px; font-size: 1.8rem; animation: floatUpApp 4s linear forwards; opacity: 0.75; }
         @keyframes floatUpApp { to { transform: translateY(-105vh) translateX(80px) rotate(180deg); opacity: 0; } }
 
-        /* ===== STUDENT ACCOUNTS MANAGEMENT ===== */
         .student-list-item { display: flex; align-items: center; justify-content: space-between; background: var(--bg-cream); padding: 0.9rem 1.3rem; border-radius: 12px; border: var(--soft-border); margin-bottom: 0.6rem; font-size: 1.05rem; }
         .student-badge { background: var(--accent-mint); padding: 0.2rem 0.8rem; border-radius: 20px; font-size: 0.9rem; font-weight: 700; }
+
+        /* Offline warning banner */
+        .offline-banner { background: #fff3cd; border: 2px solid #ffc107; border-radius: var(--border-radius-sm); padding: 0.8rem 1.2rem; margin-bottom: 1rem; font-size: 1rem; font-weight: 600; color: #856404; display: none; text-align: center; }
     </style>
 </head>
 <body>
@@ -265,9 +241,13 @@
 
     <!-- ===== LOGIN SCREEN ===== -->
     <section id="login-view">
-        <div class="login-bear-emoji" onclick="winkLoginBear()" id="login-bear">🧸</div>
+        <div style="font-size:5rem;cursor:pointer;margin-bottom:1rem;" onclick="winkLoginBear()" id="login-bear">🧸</div>
         <h1 class="login-title">🧸 <span>Filipino</span> Learning Hub</h1>
         <p class="login-subtitle">"Tuklasin ang ganda ng Wikang Filipino!" ✨</p>
+
+        <div class="offline-banner" id="offline-banner">
+            ⚠️ Hindi ma-connect sa database. Subukang i-disable ang ad blocker para sa site na ito.
+        </div>
 
         <div class="login-tabs">
             <button class="login-tab active" id="tab-student" onclick="switchLoginTab('student')">🎒 Estudyante</button>
@@ -538,9 +518,11 @@
         let announcements = [];
         let currentUser = null;
         let currentLoginTab = 'student';
+        let firebaseOnline = true;
 
-        // ===== TEACHER CREDENTIALS =====
+        // ===== DEFAULT TEACHER PASSWORD (fallback when offline) =====
         const TEACHER_USERNAME = 'MEY';
+        const DEFAULT_TEACHER_PASSWORD = 'password123';
 
         // ===== WEEK SELECT =====
         const weekSelect = document.getElementById('form-week');
@@ -595,12 +577,19 @@
             await firestore.collection('settings').doc('announcements').set({ list: announcements });
         }
 
-        // ===== TEACHER PASSWORD (Firestore) =====
+        // ===== TEACHER PASSWORD (Firestore) with offline fallback =====
         async function fetchTeacherPassword() {
-            const snap = await firestore.collection('settings').doc('teacher').get();
-            if (snap.exists) return snap.data().password;
-            await firestore.collection('settings').doc('teacher').set({ password: 'password123', quickTip: '' });
-            return 'password123';
+            try {
+                const snap = await firestore.collection('settings').doc('teacher').get();
+                if (snap.exists) return snap.data().password;
+                // First time — set default password in Firestore
+                await firestore.collection('settings').doc('teacher').set({ password: DEFAULT_TEACHER_PASSWORD, quickTip: '' });
+                return DEFAULT_TEACHER_PASSWORD;
+            } catch(e) {
+                // Firebase blocked or offline — return default password as fallback
+                console.warn('Firebase offline, using default teacher password.');
+                return DEFAULT_TEACHER_PASSWORD;
+            }
         }
 
         async function saveTeacherPassword(pass) {
@@ -608,9 +597,13 @@
         }
 
         async function fetchQuickTip() {
-            const snap = await firestore.collection('settings').doc('teacher').get();
-            if (snap.exists && snap.data().quickTip) {
-                document.getElementById('quick-tip-text').textContent = snap.data().quickTip;
+            try {
+                const snap = await firestore.collection('settings').doc('teacher').get();
+                if (snap.exists && snap.data().quickTip) {
+                    document.getElementById('quick-tip-text').textContent = snap.data().quickTip;
+                }
+            } catch(e) {
+                // silently ignore if offline
             }
         }
 
@@ -620,15 +613,25 @@
 
         // ===== INIT =====
         window.addEventListener('DOMContentLoaded', async () => {
-            // Show loading state
             document.getElementById('login-view').style.opacity = '0.6';
             try {
                 await fetchLessonsFromDB();
-                await fetchAnnouncementsFromDB();
-                await fetchQuickTip();
+                firebaseOnline = true;
             } catch(e) {
-                console.error('Firebase init error:', e);
+                firebaseOnline = false;
+                localLessons = [];
+                document.getElementById('offline-banner').style.display = 'block';
+                console.warn('Firebase offline: lessons not loaded.');
             }
+            try {
+                await fetchAnnouncementsFromDB();
+            } catch(e) {
+                announcements = ["🎉 Welcome sa ating masayang Filipino online hub!"];
+            }
+            try {
+                await fetchQuickTip();
+            } catch(e) { /* ignore */ }
+
             document.getElementById('login-view').style.opacity = '1';
             setupDragAndDrop();
         });
@@ -657,14 +660,23 @@
                     document.getElementById('student-error').style.display = 'block';
                 }
             } catch(e) {
+                // Firebase offline — students can't login without DB (accounts stored in Firestore)
                 document.getElementById('student-error').style.display = 'block';
+                document.getElementById('offline-banner').style.display = 'block';
             }
         }
 
         async function doTeacherLogin() {
             const username = document.getElementById('teacher-username').value.trim();
             const password = document.getElementById('teacher-password').value;
+
+            if (!username || !password) {
+                document.getElementById('teacher-error').style.display = 'block';
+                return;
+            }
+
             try {
+                // Try to get password from Firestore (fetchTeacherPassword has its own try/catch fallback)
                 const storedPass = await fetchTeacherPassword();
                 if (username === TEACHER_USERNAME && password === storedPass) {
                     currentUser = { username: TEACHER_USERNAME, role: 'teacher' };
@@ -673,7 +685,13 @@
                     document.getElementById('teacher-error').style.display = 'block';
                 }
             } catch(e) {
-                document.getElementById('teacher-error').style.display = 'block';
+                // Final safety net: allow login with default password even if everything fails
+                if (username === TEACHER_USERNAME && password === DEFAULT_TEACHER_PASSWORD) {
+                    currentUser = { username: TEACHER_USERNAME, role: 'teacher' };
+                    enterApp();
+                } else {
+                    document.getElementById('teacher-error').style.display = 'block';
+                }
             }
         }
 
@@ -708,7 +726,6 @@
             currentUser = null;
             document.getElementById('app-view').classList.remove('active');
             document.getElementById('login-view').classList.remove('hidden');
-            // Clear inputs
             document.getElementById('student-username').value = '';
             document.getElementById('student-password').value = '';
             document.getElementById('teacher-username').value = '';
@@ -726,14 +743,14 @@
             if (!username || !password) { alert('Pakipunan ang username at password!'); return; }
             if (password.length < 4) { alert('Dapat hindi bababa sa 4 na karakter ang password!'); return; }
             try {
-                const existing = await getDoc(doc(firestore, 'students', username));
-                if (existing.exists()) { alert('Mayroon nang ganitong username! Pumili ng iba.'); return; }
+                const existing = await firestore.collection('students').doc(username).get();
+                if (existing.exists) { alert('Mayroon nang ganitong username! Pumili ng iba.'); return; }
                 await addStudentToFirestore(username, password);
                 document.getElementById('new-student-username').value = '';
                 document.getElementById('new-student-password').value = '';
                 alert(`Matagumpay na naidagdag ang account para kay "${username}"! 🎉`);
                 await renderStudentAccountsList();
-            } catch(e) { alert('May error. Subukan muli.'); }
+            } catch(e) { alert('May error. Subukan muli. (Baka naka-block ang Firebase sa iyong browser)'); }
         }
 
         async function deleteStudentAccount(username) {
@@ -745,17 +762,21 @@
         async function renderStudentAccountsList() {
             const container = document.getElementById('student-accounts-list');
             container.innerHTML = `<p style="color:var(--text-muted);font-size:1rem;">Nilo-load... 🐣</p>`;
-            const accounts = await getStudentAccounts();
-            if (accounts.length === 0) {
-                container.innerHTML = `<p style="color:var(--text-muted);font-style:italic;font-size:1rem;">Wala pang estudyante. Magdagdag na! 🐣</p>`;
-                return;
+            try {
+                const accounts = await getStudentAccounts();
+                if (accounts.length === 0) {
+                    container.innerHTML = `<p style="color:var(--text-muted);font-style:italic;font-size:1rem;">Wala pang estudyante. Magdagdag na! 🐣</p>`;
+                    return;
+                }
+                container.innerHTML = accounts.map(a => `
+                    <div class="student-list-item">
+                        <span><span class="student-badge">🎒</span> ${escapeHtml(a.username)}</span>
+                        <button class="btn-delete-announcement" onclick="deleteStudentAccount('${escapeHtml(a.username)}')">❌ Bura</button>
+                    </div>
+                `).join('');
+            } catch(e) {
+                container.innerHTML = `<p style="color:#d9534f;font-size:1rem;">Hindi ma-load ang listahan. (Firebase offline) ⚠️</p>`;
             }
-            container.innerHTML = accounts.map(a => `
-                <div class="student-list-item">
-                    <span><span class="student-badge">🎒</span> ${escapeHtml(a.username)}</span>
-                    <button class="btn-delete-announcement" onclick="deleteStudentAccount('${escapeHtml(a.username)}')">❌ Bura</button>
-                </div>
-            `).join('');
         }
 
         // ===== BEAR WINK =====
@@ -976,7 +997,6 @@
             await commitLessonToDB({ id, title, term, week, keywords, content, attachments });
             await fetchLessonsFromDB();
             resetLessonForm(); renderAdminLessonsTable(); renderFeaturedAndAnnouncements();
-            // Refresh week view if open
             const weekView = document.getElementById('week-content-view');
             if (weekView.classList.contains('active')) renderStudentLessons();
             alert('Matagumpay na na-save ang aralin! 🎉🍿');
@@ -1023,7 +1043,7 @@
             return String(text).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
         }
 
-        // ===== EXPOSE TO GLOBAL (onclick= sa HTML ay kailangan nito) =====
+        // ===== EXPOSE TO GLOBAL =====
         window.switchLoginTab = switchLoginTab;
         window.doStudentLogin = doStudentLogin;
         window.doTeacherLogin = doTeacherLogin;
